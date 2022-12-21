@@ -1,0 +1,7 @@
+{
+    "video_name": "video.mp4",
+    "program": "slam",
+    "slam": {
+        "lowe_ratio": 0.75
+    }
+}
