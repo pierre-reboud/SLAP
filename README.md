@@ -6,6 +6,7 @@ Installation of the module is performed as follows:
 git clone git@github.com:pierre-reboud/SLAP.git
 cd SLAP
 pip install -e .
+pip install --upgrade opencv-python
 ```
 ## Usage
 Specify the program in the ```configs/program.json``` file.
