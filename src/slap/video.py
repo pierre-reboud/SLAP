@@ -1,21 +1,21 @@
 import cv2
 from typing import Dict, List, Generator
-from slap.utils.utils import Config
+from slap.utils.utils import Configs
 import numpy as np
 
 class Video:
-    def __init__(self, config: Config):
-        self.path : str = config.video_path
+    def __init__(self, configs: Configs):
+        self.path : str = configs.video_path
         self.capture : cv2.VideoCapture = cv2.VideoCapture(self.path)
         self.frame_count : int = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
         self.frame_W : int = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_H : int = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.stream = self.get_stream(self.path)
-        self.orb = cv2.ORB_create(nfeatures = 2000)
+        self.orb = cv2.ORB_create(nfeatures = configs.n_features)
         # Buffer of two sequential frames
         self.frames_buffer : np.ndarray = np.empty((2, self.frame_H, self.frame_W), dtype = np.uint8)
         self.keypoints_buffer : List = [None, None] #(2, 500, 32)
-        self.descriptors_buffer : np.ndarray = np.empty((2, 2000, 32), dtype = np.float32)        
+        self.descriptors_buffer : np.ndarray = np.empty((2, configs.n_features, configs.size_descriptor_buffer), dtype = np.float32)        
         self.matcher = cv2.BFMatcher()
 
     def get_stream(self, video_path: str) -> Generator[np.ndarray, str, None]:

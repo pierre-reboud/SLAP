@@ -2,16 +2,16 @@
 
 import cv2
 from slap.video import Video
-from slap.utils.utils import Config
+from slap.utils.utils import Configs
 from typing import Dict, List
 import numpy as np
 import itertools
 from sys import exit
 
 class Slam:
-    def __init__(self, config: Config):
-        self.configs : Config = config
-        self.video : Video = Video(config)
+    def __init__(self, configs: Configs):
+        self.configs : Config = configs
+        self.video : Video = Video(configs)
     
     def run(self) -> NotImplemented:
         pass
@@ -31,7 +31,7 @@ class Slam:
                 matches = self.get_matches()
                 self.process_matches(matches, color_frame)
                 cv2.imshow("SLAM oder so kp hab nicht aufgepasst", color_frame)
-                cv2.waitKey(1)
+                cv2.waitKey(int(not self.configs.debug_frame_by_frame))
 
     def process_matches(self, matches, frame) -> None:
         points_frame_1 = np.array([np.uint16(self.video.keypoints_buffer[0][match[0].queryIdx].pt) for match in matches])
@@ -39,7 +39,7 @@ class Slam:
         self.draw_matched_frame(points_frame_1, points_frame_2, frame)
         #print((cv2.findFundamentalMat.__doc__))
         F = cv2.findFundamentalMat(points_frame_1, points_frame_2, method = cv2.FM_RANSAC)
-        E, _ = cv2.findEssentialMat(points_frame_1, points_frame_2, focal = 1, pp = np.zeros((2)), method = cv2.RANSAC)#, param1 = 3, param2 = 0.99)
+        E, _ = cv2.findEssentialMat(points_frame_1, points_frame_2, focal = 580, pp = np.zeros((2)), method = cv2.RANSAC)#, param1 = 3, param2 = 0.99)
         R1, R2,t = cv2.decomposeEssentialMat(E)
         print(R1, "\t", R2, "\t", t.T)
 
@@ -58,14 +58,13 @@ class Slam:
     def apply_lowe_ratio(self, candidate_matches) -> List[List[cv2.DMatch]]:
         matches = []
         for better, worse in candidate_matches:
-            #if better.distance < self.kwargs["slam"]["lowe_ratio"] * worse:
-            if better.distance < 0.5 * worse.distance:
+            if better.distance < self.configs.lowe_ratio * worse.distance:
                 matches.append([better])
         return matches 
 
     def _test_view(self) -> None:
         for frame in itertools.islice(self.video.stream, 100):
             cv2.imshow("2d-Frame", frame)
-            cv2.waitKey(0)
+            cv2.waitKey(int(not self.configs.debug_frame_by_frame))
 
 
