@@ -8,5 +8,18 @@
     "size_descriptor_buffer": 32,
     "debug_frame_by_frame": false,
     "2d_visualization": true,
-    "3d_visualization": true
+    "3d_visualization": true,
+    "grey": false,
+    "intrinsics": {
+        "fx": 580,
+        "fy": 580,
+        "cx": 640,
+        "cy": 360,
+        "k1": -0.25722,
+        "k2": 0.09022,
+        "p1": 0,
+        "p2": 0,
+        "k3": 0
+    }
+
 }

@@ -17,10 +17,18 @@ data_path : str = os.path.join("/", *root_path,"data")
 class Configs:
 
     def __init__(self, kwargs = None):
+        def local_setattr(down_self, down_kwargs):
+            for karg, varg in down_kwargs.items():
+                if isinstance(varg, dict):
+                    down_cfgs = DownConfigs()
+                    print(down_self)
+                    setattr(down_self, karg, down_cfgs)
+                    local_setattr(down_cfgs, varg)
+                else:
+                    setattr(down_self, karg, varg)  
         if not kwargs:
             kwargs = Configs.get_args()
-        for karg, varg in kwargs.items():
-            setattr(self, karg, varg)
+        local_setattr(self, kwargs)
         debug(f"Configurations: {vars(self)}")
         self.video_path = os.path.join(data_path, self.video_name)
 
@@ -29,5 +37,19 @@ class Configs:
         with open(kwargs_path, "r") as j:
             kwargs : Dict[str, Any] = json.load(j)
             return kwargs
+    
+    def __repr__(self) -> str:
+        return ""
+    
+    
+
+
+@dataclass
+class DownConfigs:
+    def __init__(self):
+        pass
+    def __repr__(self) -> str:
+        return ""
+        
 
 

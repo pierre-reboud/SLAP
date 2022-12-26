@@ -27,7 +27,8 @@ class Slam:
             self.video.keypoints_buffer.pop(0)
             self.video.keypoints_buffer.append(keypoints)
             if index!=0:
-                color_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+                # color_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+                color_frame = frame
                 matches = self.get_matches()
                 self.process_matches(matches, color_frame)
                 cv2.imshow("SLAM oder so kp hab nicht aufgepasst", color_frame)
