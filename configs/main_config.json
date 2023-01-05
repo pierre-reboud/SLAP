@@ -7,8 +7,12 @@
     "n_features": 2000,
     "size_descriptor_buffer": 32,
     "debug_frame_by_frame": false,
-    "2d_visualization": true,
-    "3d_visualization": true,
+    "visualization_2d": true,
+    "visualization_3d": true,
+    "vis":{
+        "size_cam_buffer": 1000,
+        "size_pts_buffer": 100000
+    },
     "grey": false,
     "intrinsics": {
         "fx": 580,
@@ -20,6 +24,10 @@
         "p1": 0,
         "p2": 0,
         "k3": 0
+    },
+    "libs":{
+        "use_g2o":true,
+        "use_panglin":true,
+        "use_cv2":true
     }
-
 }

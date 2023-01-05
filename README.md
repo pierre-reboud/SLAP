@@ -1,5 +1,5 @@
-# SLAP (SLam but it's not Poetry)
-Description
+# SLAP (SLam but it's not About Poetry)
+SLAP is a simple monocular SLAM implementation.
 ## Installation
 Installation of the module is performed as follows:
 ```console
@@ -13,7 +13,16 @@ Additional libraries have to be installed:
 * pangolin: Follow the [instructions](https://github.com/uoip/pangolin)
 
 ## Usage
-Specify the program in the ```configs/program.json``` file.
+1. Specify the desired parameters in the ```configs/program.json``` file.
+2. Run the following console command:
 ```console
 python main.py
 ```
+
+## Todo
+* Make Docker work
+* Redo the Bundle Adjustment with Pybind in Cpp
+
+## Sources and Bibliography
+
+* Hartley, R., Zisserman, A. (2003). Multiple View Geometry in Computer Vision. New York, NY, USA: Cambridge University Press. ISBN: 0521540518 

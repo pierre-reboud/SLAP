@@ -3,10 +3,15 @@ import OpenGL.GL as gl
 import pangolin
 from time import sleep
 from scipy.spatial.transform import Rotation
+from slap.utils.utils import Configs
+
+from typing import List, Any, Dict, Union
 
 class Spatial_Visualizer:
-    def __init__(self, points : np.ndarray = None, cams : np.ndarray = None):
+    def __init__(self, configs: Configs):
         
+        self.configs : Configs = configs
+
         pangolin.CreateWindowAndBind('Pangolin Test', 640, 480)
         gl.glEnable(gl.GL_DEPTH_TEST)
         # Define Projection and initial ModelView matrix
@@ -19,6 +24,7 @@ class Spatial_Visualizer:
         self.dcam = pangolin.CreateDisplay()
         self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
         self.dcam.SetHandler(handler)
+        self.cams, self.points = [np.eye(4)], []
 
 
     def draw_points(self, pts : np.ndarray):
@@ -27,26 +33,41 @@ class Spatial_Visualizer:
         gl.glColor3f(0, 1, 0)
         pangolin.DrawPoints(pts)
 
-    def draw_cams(self, poses: np.ndarray, color: np.ndarray = None):
+    def draw_cams(self, poses: Union[np.ndarray, List[np.ndarray]], color: np.ndarray = None):
         # assert pose.shape == (4,4)
         # assert pose[3,3] == 1 
         # assert len(color) == 3 if color else True
         gl.glLineWidth(1)
         gl.glColor3f(0.0, 0.0, 1.0)
+        poses = np.array(poses)
         pangolin.DrawCameras(poses)
 
-    def run(self, points : np.ndarray = None, cams : np.ndarray = None):
+    def run(self, points : Union[np.ndarray, None] = None, cams : Union[np.ndarray,None] = None):
         """
         cams = np array of nx4x4 pose matrices
         points = np array of mx3 pose vectors
         """
-        while not pangolin.ShouldQuit():
+        # while not pangolin.ShouldQuit():
+        if not pangolin.ShouldQuit() and (not points is None or not cams is None) :
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            self.draw_points(points)
-            self.draw_cam(cams)
+            if not points is None and points.shape == (4,4):
+                self.points.append(points)
+                if self.configs.vis.size_pts_buffer < len(self.points):
+                    self.points.pop(0)
+                points = self.points
+            if not cams is None and cams.shape == (4,4):
+                self.cams.append(self.cams[-1]@cams)
+                if self.configs.vis.size_cam_buffer < len(self.cams):
+                    self.cams.pop(0)
+                cams = self.cams
+
+            if not points is None:
+                self.draw_points(points = points)
+            if not cams is None:
+                self.draw_cams(poses = cams)
 
             pangolin.FinishFrame()
     
@@ -67,7 +88,7 @@ class Spatial_Visualizer:
             pose[:,0:3, 0:3] = np.array([Rotation.random().as_matrix() for _ in range(5)])
             print(pose[:,0:3, 0:3].shape, pose.shape)
             pose[:,0:3,3] = np.array([np.random.rand(3)-0.5 for _ in range(5)])
-            self.draw_cam(pose)
+            self.draw_cams(pose)
 
             pangolin.FinishFrame()
 

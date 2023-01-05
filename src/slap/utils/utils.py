@@ -15,7 +15,10 @@ data_path : str = os.path.join("/", *root_path,"data")
 
 @dataclass
 class Configs:
-
+    """
+    Configs class to access config elements as attributes instead of a 
+    subscriptable dictionary. Supports nested configurations.
+    """
     def __init__(self, kwargs = None):
         def local_setattr(down_self, down_kwargs):
             for karg, varg in down_kwargs.items():
@@ -31,6 +34,12 @@ class Configs:
         local_setattr(self, kwargs)
         debug(f"Configurations: {vars(self)}")
         self.video_path = os.path.join(data_path, self.video_name)
+        self.camera_matrix = np.array([
+            [self.intrinsics.fx,0,self.intrinsics.cx],
+            [0,self.intrinsics.fy,self.intrinsics.cy],
+            [0,0,1]
+            ])
+
 
     @staticmethod
     def get_args() -> Dict[str, Any]:
@@ -40,9 +49,6 @@ class Configs:
     
     def __repr__(self) -> str:
         return ""
-    
-    
-
 
 @dataclass
 class DownConfigs:
