@@ -5,10 +5,15 @@ import numpy as np
 
 class Video:
     def __init__(self, configs: Configs):
+        """_summary_
+
+        Args:
+            configs (Configs): _description_
+        """        
         self.path : str = configs.video_path
         self.configs = configs
-        self.intrinsics : np.ndarray = self.build_intrinsics()
-        self.distortion_coefs : np.ndarray = self.build_distortion_coefs()
+        self.intrinsics : np.ndarray = self.configs.camera_matrix
+        self.distortion_coefs : np.ndarray = self.configs.distortion_coefs
         self.capture : cv2.VideoCapture = cv2.VideoCapture(self.path)
         self.frame_count : int = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
         self.frame_W : int = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -25,10 +30,22 @@ class Video:
         self.matcher = cv2.BFMatcher()
 
     def get_stream(self, video_path: str) -> Generator[np.ndarray, str, None]:
+        """_summary_
+
+        Args:
+            video_path (str): _description_
+
+        Returns:
+            _type_: _description_
+
+        Yields:
+            Generator[np.ndarray, str, None]: _description_
+        """        
         capture = cv2.VideoCapture(video_path)
         #buf : np.ndarray = np.empty((frame_count, frame_H, frame_W, 3), np.dtype('uint8'))
         frame_counter : int = 0
         frame_retrieved : bool = True
+        frame : np.ndarray
         while (frame_counter < self.frame_count and frame_retrieved):
             frame_retrieved, frame = capture.read()
             frame_counter += 1
@@ -42,21 +59,3 @@ class Video:
         #cv2.imshow('frame 10', buf[9])
         #cv2.waitKey(0)
         return None
-
-    def build_intrinsics(self) -> np.ndarray:
-        intrinsics = np.eye(3)
-        intrinsics[0,0] = self.configs.intrinsics.fx
-        intrinsics[1,1] = self.configs.intrinsics.fy
-        intrinsics[0,2] = self.configs.intrinsics.cx
-        intrinsics[1,2] = self.configs.intrinsics.cy
-        return intrinsics
-
-    def build_distortion_coefs(self) -> np.ndarray:
-        distortions = np.array([
-            self.configs.intrinsics.k1,
-            self.configs.intrinsics.k2,
-            self.configs.intrinsics.p1,
-            self.configs.intrinsics.p2,
-            self.configs.intrinsics.k3
-            ])
-        return  distortions

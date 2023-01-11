@@ -7,5 +7,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     configs = Configs()
     slam = Slam(configs)
-    slam._test_run()
+    slam.run()
     #slam.run()
