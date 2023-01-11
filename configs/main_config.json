@@ -1,7 +1,7 @@
 {
     "video_name": "video.mp4",
     "program": "slam",
-    "lowe_ratio": 0.5,
+    "lowe_ratio": 0.75,
     "frame_h": 720,
     "frame_w": 1280,
     "n_features": 2000,

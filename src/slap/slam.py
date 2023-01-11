@@ -61,17 +61,18 @@ class Slam:
         self.draw_matched_frame(points_frame_1, points_frame_2, frame)
         #print((cv2.findFundamentalMat.__doc__))
         #F = cv2.findFundamentalMat(points_frame_1, points_frame_2, method = cv2.FM_RANSAC)
-        E, _ = cv2.findEssentialMat(
+        E, _mask = cv2.findEssentialMat(
             points1 = points_frame_1,
             points2 = points_frame_2,
             cameraMatrix = self.configs.camera_matrix,
             method = cv2.RANSAC
             )
-        _, R, t, _ = cv2.recoverPose(
+        _num_inliers, R, t, _ = cv2.recoverPose(
             E = E,
             points1 = points_frame_1,
             points2 = points_frame_2, 
-            cameraMatrix = self.configs.camera_matrix
+            cameraMatrix = self.configs.camera_matrix,
+            mask=_mask
             )
         #R1, R2,t = cv2.decomposeEssentialMat(E)
         if self.configs.visualization_3d:
@@ -102,7 +103,8 @@ class Slam:
         matches = []
         for better, worse in candidate_matches:
             if better.distance < self.configs.lowe_ratio * worse.distance:
-                matches.append([better])
+                if better.distance < 32:
+                    matches.append([better])
         return matches 
 
     def _test_view(self) -> None:

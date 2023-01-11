@@ -16,7 +16,7 @@ class Spatial_Visualizer:
         gl.glEnable(gl.GL_DEPTH_TEST)
         # Define Projection and initial ModelView matrix
         self.scam = pangolin.OpenGlRenderState(
-            pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100),
+            pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 10000),
             pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
         handler = pangolin.Handler3D(self.scam)
 

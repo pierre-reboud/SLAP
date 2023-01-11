@@ -21,8 +21,8 @@ class Video:
         else:
             self.frames_buffer : np.ndarray = np.empty((2, self.frame_H, self.frame_W, 3), dtype = np.uint8)
         self.keypoints_buffer : List = [None, None] #(2, 500, 32)
-        self.descriptors_buffer : np.ndarray = np.empty((2, configs.n_features, configs.size_descriptor_buffer), dtype = np.float32)        
-        self.matcher = cv2.BFMatcher()
+        self.descriptors_buffer : np.ndarray = np.empty((2, configs.n_features, configs.size_descriptor_buffer), dtype = np.uint8)        
+        self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
 
     def get_stream(self, video_path: str) -> Generator[np.ndarray, str, None]:
         capture = cv2.VideoCapture(video_path)
