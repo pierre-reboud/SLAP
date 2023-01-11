@@ -10,6 +10,7 @@ import numpy as np
 import itertools
 from sys import exit
 from slap.visualizer import Spatial_Visualizer
+from slap.map import Map, Point, Frame
 from threading import Thread
 
 from scipy.spatial.transform import Rotation
@@ -21,6 +22,7 @@ class Slam:
         self.configs : Configs = configs
         self.video : Video = Video(configs)
         self.spatial_visualizer : Spatial_Visualizer = Spatial_Visualizer(configs)
+        self.map : Map = Map()
     
     def run(self) -> NotImplemented:
         pass
@@ -35,10 +37,21 @@ class Slam:
             # Pops the first list elements
             self.video.keypoints_buffer.pop(0)
             self.video.keypoints_buffer.append(keypoints)
+            current_frame = Frame(self.map, keypoints, descriptors)
             if index!=0:
                 # color_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+                previous_frame = self.map.frames[-2]
                 color_frame = frame
                 matches = self.get_matches()
+                # add matched points to map
+                for match in matches:
+                    if previous_frame.pts[match[0].queryIdx] is None:
+                        pt = Point(self.map)
+                        pt.add_observation(previous_frame, match[0].queryIdx)
+                        pt.add_observation(current_frame, match[0].trainIdx)
+                    elif previous_frame.pts[match[0].queryIdx] is not None and current_frame.pts[match[0].trainIdx] is None:
+                        previous_frame.pts[match[0].queryIdx].add_observation(current_frame, match[0].trainIdx)
+                        current_frame.pts[match[0].trainIdx] = previous_frame.pts[match[0].queryIdx]
                 self.process_matches(matches, color_frame)
                 
 
@@ -72,6 +85,10 @@ class Slam:
         #points_frame_2 = [np.uint16(self.video.keypoints_buffer[1][match[0].trainIdx].pt) for match in matches]
         for pt1, pt2 in zip(points_frame_1, points_frame_2):
             cv2.line(frame, pt1, pt2, color = (0,255,0),thickness = 2)
+        for pt in filter(None, self.map.frames[-1].pts):
+            if len(pt.frames) > 2:
+                for f1, idx1, f2, idx2 in zip(pt.frames, pt.idxs, pt.frames[1:], pt.idxs[1:]):
+                    cv2.line(frame, np.uint16(f1.kps[idx1].pt), np.uint16(f2.kps[idx2].pt), color = (255,0,0),thickness = 1)
         if self.configs.visualization_2d:
             cv2.imshow("SLAM oder so kp hab nicht aufgepasst", frame)
             cv2.waitKey(int(not self.configs.debug_frame_by_frame))
