@@ -2,8 +2,7 @@ import json
 import numpy as np
 import cv2
 from slap import __path__ 
-
-import sys
+from sys import exit
 import os
 from typing import List, Dict, Any, Generator
 from dataclasses import dataclass
@@ -78,6 +77,10 @@ class DownConfigs:
         pass
     def __repr__(self) -> str:
         return ""
+
+def signal_handler(sig, frame):
+    info("Interrupt signal received! Exiting...")
+    exit(0)
         
 
 

@@ -13,7 +13,6 @@ import numpy as np
 import itertools
 from sys import exit
 from slap.visualizer import Visualizer
-from threading import Thread
 
 from scipy.spatial.transform import Rotation
 from sklearn.decomposition import TruncatedSVD
@@ -39,51 +38,87 @@ class Slam:
             NotImplemented: _description_
         """        
         # Get frame and index from video stream
-        for index, frame in enumerate(self.video.stream):
+        frame: np.ndarray
+        newest: int
+        for index, (frame, newer, older) in enumerate(self.video.stream):
             # Tuple of cv2 keypoint objects , descriptorts = nd array of nx32
             keypoints, descriptors = self.video.orb.detectAndCompute(frame, None)       
             #print("Shape: ", len(keypoints), descriptors.shape) 
-            self.video.descriptors_buffer[0] = self.video.descriptors_buffer[1] 
-            self.video.descriptors_buffer[1] = descriptors
-            # Pops the first list elements
+            
+            # Add to queue
+            self.video.descriptors_buffer[newer] = descriptors
+            # self.video.keypoints_buffer.pop(newer)
+            # self.video.keypoints_buffer.insert(newer, keypoints)
             self.video.keypoints_buffer.pop(0)
-            self.video.keypoints_buffer.append(keypoints)
-            if index!=0:
-                # color_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-                color_frame = frame
-                matches = self.get_matches()
-                self.process_matches(matches, color_frame)
+            self.video.keypoints_buffer.insert(2, keypoints)
 
-    def process_matches(self, matches : List[List[cv2.DMatch]], frame) -> None:
+            # Only match when two frames are available 
+            if index!=0:
+                matches = self.get_matches(newer, older)
+                self.process_matches(matches, frame, newer, older, index)
+
+    def process_matches(self, matches : List[List[cv2.DMatch]], frame: np.ndarray, newer : int, older: int, index : int) -> None:
         """_summary_
 
         Args:
             matches (List[List[cv2.DMatch]]): _description_
-            frame (_type_): _description_
+            frame (np.ndarray): _description_
+            newer (int): Index of the newer element in the buffer (0 or 1)
+            older (int): Index of the older element in the buffer (0 or 1)
+            index (int): Index of the current frame
         """                
-        points_frame_1 : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[0][match[0].queryIdx].pt) for match in matches])
-        points_frame_2 : np.ndarray =  np.array([np.uint16(self.video.keypoints_buffer[1][match[0].trainIdx].pt) for match in matches])
+        # points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[older][match[0].trainIdx].pt) for match in matches])
+        # points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[newer][match[0].queryIdx].pt) for match in matches])
+        points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match[0].trainIdx].pt) for match in matches])
+        points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[2][match[0].queryIdx].pt) for match in matches]) 
 
-        # Cam pose is 4x4 pose
-        cam_pose : np.ndarray = self._get_cam_pose(points_frame_1 = points_frame_1, points_frame_2 = points_frame_2)
-        points_pose : np.ndarray = self._get_points_pose(points_frame_1, points_frame_2)
+        normalized_points_older = points_older #/ (self.configs.frame_w, self.configs.frame_h)
+        normalized_points_newer = points_newer #/ (self.configs.frame_w, self.configs.frame_h)
 
+        point_colors = self.video.frames_buffer[newer,points_newer[:,1], points_newer[:,0]] / 255.0 
+        # Cam pose is 4x4 pose (takes point in first, transforms into second coord sys)
+        camera_pose : np.ndarray = self._get_cam_pose(
+            points_older = points_older,
+            points_newer = points_newer
+            )
+        points : np.ndarray = self._get_points_pose(
+            points_older = points_older,
+            points_newer = points_newer,
+            new_cam_pose = camera_pose
+            )
+
+        # Map operations
+        self.mapify(
+            camera_pose = camera_pose,
+            points = points,
+            point_colors = point_colors,
+            matches = matches
+            )
         # 2d visualization
-        self.visualizer._draw_matched_frame(points_frame_1, points_frame_2, frame)
+        self.visualizer._draw_matched_frame(
+            points_older = points_older,
+            points_newer = points_newer,
+            frame = frame
+            )
         # 3d visualization
-        self.visualizer.run(points = None, cams = cam_pose)
-        
-        
-        debug(f"R(euler) {Rotation.from_matrix(cam_pose[:3,:3]).as_euler('xyz', degrees = True)} \t t {cam_pose[:3,3]}")
+        self.visualizer.draw(map = self.map)
+        debug(f"R(euler) {Rotation.from_matrix(camera_pose[:3,:3]).as_euler('xyz', degrees = True)} \t t {camera_pose[:3,3]}")
 
 
-    def get_matches(self) -> List[List[cv2.DMatch]]:
+    def get_matches(self, newer : int, older : int) -> List[List[cv2.DMatch]]:
         """_summary_
+
+        Args:
+            newer (int): Index of the newer element in the buffer (0 or 1)
+            older (int): Index of the older element in the buffer (0 or 1)
 
         Returns:
             List[List[cv2.DMatch]]: _description_
         """        
-        candidate_matches = self.video.matcher.knnMatch(self.video.descriptors_buffer[0], self.video.descriptors_buffer[1], k = 2)
+        candidate_matches = self.video.matcher.knnMatch(
+            queryDescriptors = self.video.descriptors_buffer[newer],
+            trainDescriptors = self.video.descriptors_buffer[older], k = 2
+            )
         matches = self.apply_lowe_ratio(candidate_matches)
         return matches
     
@@ -102,80 +137,58 @@ class Slam:
                 matches.append([better])
         return matches 
 
-    def _get_cam_pose(self, points_frame_1 : np.ndarray, points_frame_2 : np.ndarray) -> np.ndarray:
+    def _get_cam_pose(self, points_older : np.ndarray, points_newer : np.ndarray) -> np.ndarray:
         """Estimates the cam pose matrix in the coordinates of the previous frame
+        (takes point in first, transforms into second coord sys)
 
         Args:
-            points1 (np.ndarray): _description_
-            points2 (np.ndarray): _description_
+            points_older (np.ndarray): _description_
+            points_newer (np.ndarray): _description_
 
         Returns:
             np.ndarray: 4x4 pose array in the coordinates of the previous pose
         """
-        #print((cv2.findFundamentalMat.__doc__))
-        
-        F, _mask = cv2.findFundamentalMat(points_frame_1, points_frame_2, method = cv2.FM_RANSAC)
-        E = self.configs.camera_matrix@F@self.configs.camera_matrix.T
-        R1, R2,t = cv2.decomposeEssentialMat(E)
-        t = t[:,0]
         # Hacky ambiguity resolution
-        euler_angles_1 = Rotation.from_matrix(R1).as_euler('xyz', degrees = True)
-        euler_angles_2 = Rotation.from_matrix(R2).as_euler('xyz', degrees = True)
-        R = R1 if max(euler_angles_1) < max(euler_angles_2) else R2
-        # Frame time interval
-        T = 1/29.97
-        if not hasattr(self, "prev_t"):
-            self.prev_t = np.zeros(3)
-        v = (self.prev_t - t) / T
-        # If euler integration of speed is closer to negative vector
-        t = t if np.linalg.norm(self.prev_t + v*T - t) < np.linalg.norm(self.prev_t + v*T - (-t)) else -t 
-        self.prev_t = t
-        # import pdb
-        # pdb.set_trace()
-        # R,t = self._essential_to_Rt(E)
-        
-        # E, _ = cv2.findEssentialMat(
-        #     points1 = points_frame_1,
-        #     points2 = points_frame_2,
-        #     cameraMatrix = self.configs.camera_matrix,
-        #     method = cv2.RANSAC
-        #     )
-        # _, R, t, _ = cv2.recoverPose(
-        #     E = E,
-        #     points1 = points_frame_1,
-        #     points2 = points_frame_2, 
-        #     cameraMatrix = self.configs.camera_matrix
-        #     )
+        if self.configs.ambiguity_resolution == "cv2":
+            E, _ = cv2.findEssentialMat(
+                points2 = points_newer,
+                points1 = points_older,
+                cameraMatrix = self.configs.camera_matrix,
+                method = cv2.RANSAC
+                )
+            # From first camera to second (takes point in first, transforms into second coord sys)
+            _, R, t, _ = cv2.recoverPose(
+                E = E,
+                points2 = points_newer,
+                points1 = points_older, 
+                cameraMatrix = self.configs.camera_matrix
+                )
+            t = t[:,0]
+        # Cv2 ambiguity resolution
+        elif self.configs.ambiguity_resolution == "hacky":
+            F, _mask = cv2.findFundamentalMat(
+                points1 = points_newer,
+                points2 = points_older,
+                method = cv2.FM_RANSAC)
+            E = self.configs.camera_matrix.T@F@self.configs.camera_matrix
+            R1, R2,t = cv2.decomposeEssentialMat(E)
+            t = t[:,0]
+            euler_angles_1 = Rotation.from_matrix(R1).as_euler('xyz', degrees = True)
+            euler_angles_2 = Rotation.from_matrix(R2).as_euler('xyz', degrees = True)
+            R = R1 if max(euler_angles_1) < max(euler_angles_2) else R2
+            # Frame time interval
+            T = 1/29.97
+            if not hasattr(self, "prev_t"):
+                self._prev_t = np.zeros(3)
+            v = (self._prev_t - t) / T
+            # If euler integration of speed is closer to negative vector
+            t = t if np.linalg.norm(self._prev_t + v*T - t) < np.linalg.norm(self._prev_t + v*T - (-t)) else -t 
+            self._prev_t = t
         cam_pose : np.ndarray = self._get_cam_pose_from_Rt(R, t)
         return cam_pose
 
     def _fundamental_to_Rt(self, F : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """From https://github.com/geohot/twitchslam
-
-        Args:
-            F (np.ndarray): _description_
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: _description_
-        """                              
-        W = np.array([[0,-1,0],[1,0,0],[0,0,1]],dtype=float)
-        U,d,Vt = np.linalg.svd(F, full_matrices = True)
-        if np.linalg.det(U) < 0:
-            U *= -1.0
-        if np.linalg.det(Vt) < 0:
-            Vt *= -1.0
-        R = np.dot(np.dot(U, W), Vt)
-        if np.sum(R.diagonal()) < 0:
-            R = np.dot(np.dot(U, W.T), Vt)
-        t = U[:, 2]
-
-        # TODO: Resolve ambiguities in better ways. This is wrong.
-        if t[2] < 0:
-            t *= -1
-        return R, t
-
-    def _essential_to_Rt(self, R : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """From https://ia601408.us.archive.org/view_archive.php?archive=/7/items/DIKU-3DCV2/DIKU-3DCV2.zip&file=DIKU-3DCV2%2FHandouts%2FLecture16.pdf slide 
 
         Args:
             F (np.ndarray): _description_
@@ -214,38 +227,76 @@ class Slam:
         cam_pose[:3,3] = t
         return cam_pose
 
-    def _get_points_pose(self, points1, points2):
+    def _get_points_pose(self, points_older : np.ndarray, points_newer : np.ndarray, new_cam_pose : np.ndarray) -> np.ndarray:
         """_summary_
 
         Args:
-            points1 (_type_): _description_
-            points2 (_type_): _description_
+            points_older (_type_): _description_
+            points_newer (_type_): _description_
             R (_type_): _description_
             t (_type_): _description_
             E (_type_): _description_
 
         Returns:
             _type_: _description_
-        """        
-        # Use factorization method slide 75
+        """
+        if not hasattr(self, "_old_cam_pose"):
+            old_cam_pose = np.eye(4)
+        else:
+            old_cam_pose = self._old_cam_pose
+
         # http://vision.stanford.edu/teaching/cs231a_autumn1112/lecture/lecture10_multi_view_cs231a.pdf
-        D = np.int16(np.concatenate((points1, points2), axis = 1).T)#np.empty((4,len(points1)))
+        # Use factorization method slide 75
+        if self.configs.points_extraction == "factorization":
+            # D = [x,y,x',y']^Txn
+            D = np.int16(np.concatenate((points_older, points_newer), axis = 1).T)
+            # 4-array of [x,y,x',y'] centroid
+            d_avg = np.average(D,axis = 1)
+            # D centered in centroid and transposed -> nx4
+            D = (D.T-d_avg).T 
+            uu,ss,vh = np.linalg.svd(D, full_matrices = True)
+            # M is the projection matrix of the 3d points to 2d frame coordinates
+            M = uu[:,:3]
+            # S is the nx3 matrix of points in 3d space 
+            S = (np.diag(ss[:-1])@vh[:3]).T
+            points_4d = np.concatenate((S,np.ones(len(points_older))[None].T), axis = 1)
+
+        # As in page 330 of Book Multiple View Geometry
+        elif self.configs.points_extraction == "linear_triangulation":
+            points_4d : np.ndarray = np.zeros((len(points_older),4))
+            A = np.zeros((4 , 4 * len(points_newer)))
+            A[0 , :] = np.outer(points_older[: , 0], old_cam_pose[2]).flatten()[None] - np.repeat(old_cam_pose[0], len(points_older), axis = 0)
+            A[1 , :] = np.outer(points_older[: , 1], old_cam_pose[2]).flatten()[None] - np.repeat(old_cam_pose[1], len(points_older), axis = 0)
+            A[2 , :] = np.outer(points_newer[: , 0], new_cam_pose[2]).flatten()[None] - np.repeat(new_cam_pose[0], len(points_older), axis = 0)
+            A[3 , :] = np.outer(points_newer[: , 1], new_cam_pose[2]).flatten()[None] - np.repeat(new_cam_pose[1], len(points_older), axis = 0)
+            for i, (pn, po) in enumerate(zip(points_newer, points_older)):
+                # Get nullspace vector (x, where Ax = 0, multiple possible vectors)
+                # last vh row is vector corresponding to (close to) null singular value
+                u, s, vh = np.linalg.svd(A[:,i*4:(i+1)*4], full_matrices = True)
+                points_4d[i] = vh[-1] / vh[-1,3]
+                #points_4d[i] = np.linalg.inv(new_cam_pose)@points_4d[i] # @(old_cam_pose.T) # Because (A@P^T)^T = (P@A^T) 
+                self._old_cam_pose = np.linalg.inv(new_cam_pose)@old_cam_pose
+            import pdb
+            pdb.set_trace()
+            # u, s, vh = np.linalg.svd(A, full_matrices = True)
+            # points_4d : np.ndarray = np.reshape(vh[-1], (-1, 4))
+            # points_4d = points_4d / (np.repeat(points_4d[:,3][None], 4, axis = 0)).T
+            # points_4d = points_4d@(old_cam_pose.T) # Because (A@P^T)^T = (P@A^T) 
+            # self._old_cam_pose = np.linalg.inv(new_cam_pose)@old_cam_pose
+            debug(f"\n{old_cam_pose[:3,3]} \n")
+
+        return points_4d
+
+    def mapify(self, points : np.ndarray, camera_pose : np.ndarray, point_colors : np.ndarray, matches : List[List[cv2.DMatch]]):
         # import pdb
         # pdb.set_trace()
-        D = (D.T-np.average(D,axis = 1)).T
-        uu,ss,vh = np.linalg.svd(D, full_matrices = True)
-        debug(f"u {uu.shape}, s {ss.shape}, vh {vh.shape}")
-        # M is the projection matrix of the 3d points to 2d frame coordinates
-        M = uu[:,:3]
-        # S is the nx3 matrix of points in 3d space 
-        S = (np.diag(ss[:-1])@vh[:3]).T
-        # svd = TruncatedSVD(n_components = 3)
-        # P = svd.fit_transform(D.T)
-        return S
-
-    def _append_to_map(self, points : np.ndarray, cam_pose : np.ndarray):
-        view : View = View(pose = cam_pose)
-        self.map.add_view(view)
+        self.map.update(
+            camera_pose = camera_pose,
+            spatial_points = points,
+            points_mask = None,
+            point_colors = point_colors
+            )
+            
           
     
 
