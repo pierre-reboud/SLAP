@@ -15,7 +15,7 @@ from sys import exit
 from slap.visualizer import Visualizer
 
 from scipy.spatial.transform import Rotation
-from sklearn.decomposition import TruncatedSVD
+from itertools import starmap
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -30,7 +30,7 @@ class Slam:
         self.video : Video = Video(configs)
         self.visualizer : Visualizer = Visualizer(configs)
         self.map : Map = Map()
-        self.matches_buffer : List[List[cv2.DMatch]] = [] 
+        self.matches_buffer : List[cv2.DMatch] = [] 
     
     def run(self) -> NotImplemented:
         """_summary_
@@ -70,8 +70,8 @@ class Slam:
         """                
         # points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[older][match[0].trainIdx].pt) for match in matches])
         # points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[newer][match[0].queryIdx].pt) for match in matches])
-        points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match[0].trainIdx].pt) for match in self.matches_buffer[-1]])
-        points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[2][match[0].queryIdx].pt) for match in self.matches_buffer[-1]]) 
+        points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match.trainIdx].pt) for match in self.matches_buffer[-1]])
+        points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[2][match.queryIdx].pt) for match in self.matches_buffer[-1]]) 
 
         normalized_points_older = (np.linalg.inv(self.configs.camera_matrix)@np.concatenate((points_older.T,np.ones(len(points_older))[None]), axis = 0))[:2].T
         normalized_points_newer = (np.linalg.inv(self.configs.camera_matrix)@np.concatenate((points_newer.T,np.ones(len(points_older))[None]), axis = 0))[:2].T
@@ -123,7 +123,7 @@ class Slam:
         if len(self.matches_buffer) > 2:
             self.matches_buffer.pop(0)
     
-    def _apply_lowe_ratio(self, candidate_matches : List[List[cv2.DMatch]]) -> None:
+    def _apply_lowe_ratio(self, candidate_matches : List[cv2.DMatch]) -> None:
         """_summary_
 
         Args:
@@ -132,10 +132,10 @@ class Slam:
         Returns:
             List[List[cv2.DMatch]]: _description_
         """        
-        matches : List[List[cv2.DMatch]]= []
+        matches : List[cv2.DMatch]= []
         for better, worse in candidate_matches:
             if better.distance < self.configs.lowe_ratio * worse.distance:
-                matches.append([better])
+                matches.append(better)
         self.matches_buffer.append(matches)
 
     def _get_cam_pose(self, points_older : np.ndarray, points_newer : np.ndarray) -> np.ndarray:
@@ -254,12 +254,15 @@ class Slam:
         return points_4d
 
     def mapify(self, points : np.ndarray, camera_pose : np.ndarray, point_colors : np.ndarray):
-        # points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[0][match[0].trainIdx].pt) for match in matches])
-        # points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match[0].queryIdx].pt) for match in matches]) 
+        new_points : np.ndarray = np.ones((len(points),), dtype = bool)
+        if len(self.matches_buffer) > 1:
+            check_same_pt : bool = lambda m_o, m_n : not self.video.keypoints_buffer[1][m_o.queryIdx].pt == self.video.keypoints_buffer[1][m_n.trainIdx].pt
+            for i, new_match in enumerate(self.matches_buffer[1]):
+                new_points[i] = min(map(check_same_pt, self.matches_buffer[0], [new_match] * len(self.matches_buffer[0])))
         self.map.update(
             camera_pose = camera_pose,
             spatial_points = points,
-            points_mask = None,
+            points_mask = new_points,
             point_colors = point_colors
             )
             

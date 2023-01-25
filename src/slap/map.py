@@ -3,6 +3,7 @@ from slap.view import View
 from slap.point import Point
 
 from typing import List, Any, Dict
+from logging import debug, info
 
 class Map:
 
@@ -30,7 +31,8 @@ class Map:
                 that have yet to be included
         """        
         self._add_camera(camera_pose)
-        self._add_points(spatial_points, point_colors)#[points_mask])
+        self._add_points(spatial_points[points_mask], point_colors[points_mask])
+        info(f"New points: {points_mask.sum()}, \n Already mapped points {len(points_mask)-points_mask.sum()}, \n Total points: {self.points.shape[0]}")
 
 
     def _add_camera(self, pose: np.ndarray) -> None:
