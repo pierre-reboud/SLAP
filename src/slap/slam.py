@@ -256,10 +256,20 @@ class Slam:
     def mapify(self, points : np.ndarray, camera_pose : np.ndarray, point_colors : np.ndarray):
         # points_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[0][match[0].trainIdx].pt) for match in matches])
         # points_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match[0].queryIdx].pt) for match in matches]) 
+        if not self.map.views[-1]:
+            self.map.views[-2] = View(np.array([0,0,0]), len(self.video.keypoints_buffer[1]))
+            self.map.views[-1] = View(camera_pose, len(self.video.keypoints_buffer[2]))
+            # points_ids0 : np.ndarray = np.zeros(len(self.video.keypoints_buffer[1]))
+            # points_ids1 : np.ndarray = np.zeros(len(self.video.keypoints_buffer[2]))
+            # self.map.views[-2].add_point_ids(points_ids0)
+            # self.map.views[-1].add_point_ids(points_ids1)
+        else:
+            self.map.views.pop(0)
+            self.map.views.append(View((np.linalg.inv(camera_pose)@self.map.cameras[-1])[None], len(self.video.keypoints_buffer[2])))
         self.map.update(
             camera_pose = camera_pose,
             spatial_points = points,
-            points_mask = None,
+            matches= self.matches_buffer[-1],
             point_colors = point_colors
             )
             
