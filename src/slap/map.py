@@ -45,6 +45,7 @@ class Map:
                     self.statistics["n_points"] += 1
                     # add new point into mappoints
                     self.points = np.concatenate((self.points, [spatial_points[idx, :]]), axis = 0)
+                    self.point_colors = np.concatenate((self.point_colors, [point_colors[idx, :]]), axis = 0)
                     # add matched times for the points
                     self.matches_times = np.append(self.matches_times, 1)
         else:
@@ -64,12 +65,16 @@ class Map:
 
         # culling point with number of matches under 3
         if self.views[0]:
-            self.points[self.matches_times[np.max(self.views[0]._point_ids):np.max(self.views[1]._point_ids)], :] = np.array([0,0,0,1])
+            boolean_array = self.matches_times[np.max(self.views[0]._point_ids):np.max(self.views[1]._point_ids)] < 3
+            full_true1 = np.full(np.max(self.views[0]._point_ids), False)
+            full_true2 = np.full(self.points.shape[0] - np.max(self.views[1]._point_ids), False)
+            new_ba = np.concatenate((full_true1, boolean_array, full_true2))
+            self.points[new_ba, :] = np.array([0.5,0.5,0.5,1])
         elif self.views[1]:
             boolean_array = self.matches_times[:np.max(self.views[1]._point_ids) + 1] < 3
-            full_true = np.full(self.points.shape[0] - np.max(self.views[1]._point_ids) - 1, True)
+            full_true = np.full(self.points.shape[0] - np.max(self.views[1]._point_ids) - 1, False)
             new_ba = np.concatenate((boolean_array, full_true))
-            self.points[new_ba, :] = np.array([0,0,0,1])
+            self.points[new_ba, :] = np.array([0.5,0.5,0.5,1])
         # self._add_points(spatial_points, point_colors)#[points_mask])
 
 
