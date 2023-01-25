@@ -31,5 +31,5 @@
         "use_cv2":true
     },
     "ambiguity_resolution": "cv2",
-    "points_extraction" : "factorization"
+    "points_extraction" : "linear_triangulation"
 }
