@@ -310,7 +310,7 @@ class Slam:
                     correspondences_to_prev[i] = np.where(bool_matches == False)[0][0]
         
             # Compute correspondences to next ( global_index - 1 bc we want previous frame )
-            len_correspondences_to_current = len(self.map._correspondences[Slam.global_frame_index - 1][0])
+            len_correspondences_to_current = len(self.map._correspondences[Slam.global_frame_index - 1]["pts_2d"])
             correspondences_to_current : np.ndarray = -np.ones(len_correspondences_to_current, dtype = np.int16)
             correspondences_to_current[correspondences_to_prev[correspondences_to_prev >= 0]] = np.where(correspondences_to_prev >= 0)[0]
             

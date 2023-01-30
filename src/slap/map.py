@@ -73,13 +73,14 @@ class Map:
     def optimize(self) -> None:
         """_summary_
         """      
-        optimizeable_cameras = self.cameras[Map.global_frame_index - self.configs.optimizer.window_size: Map.global_frame_index]
+
+        optimizeable_cameras = self.cameras[max(0,Map.global_frame_index - self.configs.optimizer.window_size): Map.global_frame_index]
         optimizeable_3d_points = self._optimizer_points_3d
         #points_2d_to_optimize, points_3d_to_optimize = self._get_optimization_points_subsets()
         points_2d_to_optimize = [self._correspondences[k]["pts_2d"] for k in self._correspondences.keys()]
         correspondences = self._correspondences
         optimized_3d_points : List[np.ndarray]
-        optimized_cameras : np.ndarray
+        optimized_cameras : np.ndarray 
         optimized_3d_points, optimized_cameras = self.optimizer.bundle_adjust(
             points_2d = points_2d_to_optimize,
             points_3d = optimizeable_3d_points,
@@ -124,17 +125,17 @@ class Map:
             correspondences_to_prev (np.ndarray): _description_
             correspondences_to_current (np.ndarray): _description_
         """        
-        if points_2d_older is not None:
-            self._correspondences.update(
-                {
-                    0: {
-                    "pts_2d" : points_2d_older,
-                    "new_pts_mask" : new_points_mask,
-                    "corrs_to_prev" : correspondences_to_prev,
-                    "corrs_to curr" : correspondences_to_current  
-                    }
-                }
-            )
+        # if points_2d_older is not None:
+        #     self._correspondences.update(
+        #         {
+        #             0: {
+        #             "pts_2d" : points_2d_older,
+        #             "new_pts_mask" : new_points_mask,
+        #             "corrs_to_prev" : correspondences_to_prev,
+        #             "corrs_to curr" : correspondences_to_current  
+        #             }
+        #         }
+        #     )
         self._correspondences.update(
             {
                 Map.global_frame_index: {
