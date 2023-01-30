@@ -7,11 +7,11 @@
     "n_features": 2000,
     "size_descriptor_buffer": 32,
     "debug_frame_by_frame": false,
-    "visualization_2d": false,
-    "visualization_3d": true,
-    "vis":{
+    "visualization":{
         "size_cam_buffer": 1000,
-        "size_pts_buffer": 100000
+        "size_pts_buffer": 100000,
+        "_2d": false,
+        "_3d": true
     },
     "grey": false,
     "intrinsics": {
@@ -31,5 +31,9 @@
         "use_cv2":true
     },
     "ambiguity_resolution": "cv2",
-    "points_extraction" : "linear_triangulation"
+    "points_extraction" : "linear_triangulation",
+    "optimizer":{
+        "window_size": 5,
+        "iterations": 5
+    }
 }

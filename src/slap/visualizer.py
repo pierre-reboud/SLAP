@@ -72,7 +72,7 @@ class Visualizer:
         """
         signal.signal(signal.SIGINT, signal_handler)
         self._init_pangolin()
-        if self.configs.visualization_3d:
+        if self.configs.visualization._3d:
             while not pangolin.ShouldQuit():
                 while not queue.empty():
                     self.map_state = queue.get()  
@@ -82,7 +82,7 @@ class Visualizer:
                 self.dcam.Activate(self.scam)
                 if self.map_state is not None: 
                     if not len(self.map_state.points) == 0:
-                        self.draw_points(points = self.map_state.points, colors = self.map_state.point_colors)
+                        self.draw_points(points = self.map_state._fixed_points_3d, colors = self.map_state._fixed_point_colors)
                     if not len(self.map_state.cameras) == 0:
                         self.draw_cams(poses = self.map_state.cameras)
                 pangolin.FinishFrame()
@@ -113,7 +113,7 @@ class Visualizer:
 
             pangolin.FinishFrame()
 
-    def _draw_matched_frame(self, points_older : np.ndarray, points_newer : np.ndarray, frame : np.ndarray) -> None:
+    def _draw_matched_frame(self, points_2d_older : np.ndarray, points_2d_newer : np.ndarray, frame : np.ndarray) -> None:
         """Draws the 2d frames with the corresponding point correspondences 
 
         Args:
@@ -121,8 +121,8 @@ class Visualizer:
             points_newer (np.ndarray): _description_
             frame (_type_): _description_
         """        
-        if self.configs.visualization_2d:
-            for pt1, pt2 in zip(points_older, points_newer):
+        if self.configs.visualization._2d:
+            for pt1, pt2 in zip(points_2d_older, points_2d_newer):
                 # _ = cv2.drawKeypoints(frame, keypoints, None, color=(0,255,0), flags = 0)         
                 cv2.line(frame, pt1, pt2, color = (0,255,0),thickness = 2)
             cv2.imshow("SLAM oder so kp hab nicht aufgepasst", frame)
