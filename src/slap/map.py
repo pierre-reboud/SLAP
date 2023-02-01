@@ -125,24 +125,24 @@ class Map:
             correspondences_to_prev (np.ndarray): _description_
             correspondences_to_current (np.ndarray): _description_
         """        
-        # if points_2d_older is not None:
-        #     self._correspondences.update(
-        #         {
-        #             0: {
-        #             "pts_2d" : points_2d_older,
-        #             "new_pts_mask" : new_points_mask,
-        #             "corrs_to_prev" : correspondences_to_prev,
-        #             "corrs_to curr" : correspondences_to_current  
-        #             }
-        #         }
-        #     )
+        if points_2d_older is not None:
+            self._correspondences.update(
+                {
+                    0: {
+                    "pts_2d" : points_2d_older,
+                    "new_pts_mask" : new_points_mask,
+                    "corrs_to_prev" : -np.ones(len(points_2d_older), dtype = np.uint16),#correspondences_to_prev,
+                    "corrs_to curr" : np.arange(len(points_2d_older), dtype = np.uint16)#correspondences_to_current  
+                    }
+                }
+            )
         self._correspondences.update(
             {
                 Map.global_frame_index: {
                     "pts_2d" : points_2d_newer,
                     "new_pts_mask" : new_points_mask,
                     "corrs_to_prev" : correspondences_to_prev,
-                    "corrs_to curr" : correspondences_to_current  
+                    "corrs_to_curr" : correspondences_to_current  
                 }
             }
         )
@@ -159,7 +159,7 @@ class Map:
             optimized_cameras (np.ndarray): _description_
         """
         # Merge cameras
-        self.cameras[Map.global_frame_index-self.configs.optimizer.window_size : Map.global_frame_index] = optimized_cameras        
+        self.cameras[max(0, Map.global_frame_index-self.configs.optimizer.window_size) : Map.global_frame_index] = optimized_cameras        
         # Merge 3d_points
         self._optimizer_points_3d = optimized_3d_points
 

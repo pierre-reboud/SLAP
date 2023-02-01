@@ -27,18 +27,20 @@ class Optimizer():
         # Get the pts_3d corresponding list (also gets updated, as underlying 
         # data is same as points_3d tensor)
         _pts_3d_group_lengths = [len(pts_3d) for pts_3d in points_3d]
+        for i, e in enumerate(_pts_3d_group_lengths):
+            _pts_3d_group_lengths[i] = e if i == 0 else e + _pts_3d_group_lengths[i-1]  
         # Torchify parameters (3d points and cameras)
         cameras : Tensor = torch.tensor(cameras, requires_grad = True)
         list_of_points_2d : List[Tensor] = [torch.tensor(pts_2d) for pts_2d in points_2d]      
         points_3d : List[Tensor] = torch.cat([torch.tensor(pts_3d) for pts_3d in points_3d])
         points_3d = torch.tensor(points_3d, requires_grad = True)
-        # Listify back the pts 3d tensor
-        list_of_points_3d : List[Tensor]= list(torch.tensor_split(points_3d, _pts_3d_group_lengths))
-        
+        # Listify back the pts 3d tensor (:-1)
+        list_of_points_3d : List[Tensor]= list(torch.tensor_split(points_3d, _pts_3d_group_lengths[:-1]))
         # Group to know which 3d points to project in which frame. The different 
         # name to points_xd is done, so that we can keep the points_xd tensor,
         # which also gets updated due to gradient flowing though all Tensor 
         # operations
+
         points_2d_optim, points_3d_optim = self._group_pts_per_frame(
             points_2d = list_of_points_2d,
             points_3d = list_of_points_3d,
@@ -82,7 +84,7 @@ class Optimizer():
             # nx4@4x4 = 4x4
             _intermediate_projections = pts_3d@(cam.T)
             # nx3@3x3
-            _intermediate_projections = _intermediate_projections[:, :3]@(torch.from_numpy(np.linalg.inv(self.configs.camera_matrix)).T)
+            #_intermediate_projections = _intermediate_projections[:, :3]@(torch.from_numpy(np.linalg.inv(self.configs.camera_matrix)).T)
             # nx2 / (2xn).T = nx2 / (nx2) = nx2 
             cam_projections = _intermediate_projections[:,:2] / _intermediate_projections[:,2].repeat(2,1).T
             
@@ -122,8 +124,7 @@ class Optimizer():
     def _group_pts_per_frame(self, points_2d : List[Tensor], points_3d : List[Tensor],
         correspondences : Dict[int, Dict[str, np.ndarray]]
         ) -> Tuple[List[Tensor], List[Tensor]]:
-        """Mother of all index fuckery!!!!
-        Don't try to understand this one in detail if you want to stay sane.
+        """Mother of all index fuckery
         Basically, groups the 3d points (newly observed in current or previous 
         frames) that match the current 2d pts. As not all 2d pts in the current
         frame have a corresponding 3d pt in the optimization window (3d point
@@ -159,32 +160,62 @@ class Optimizer():
             points_3d_to_optimize[i].append(points_3d[curr_frame_ind])
             points_2d_to_optimize[i].append(points_2d[curr_frame_ind][value["corrs_to_prev"]==-1])
             
-            # If there is a previous frame, also append all 3d pts that were seen before (but still in opt window)
-            if i < len(correspondences.keys()) - 1:
-                # Go to past index
-                j = 0
-                # While there are 2d_points in the old frame that correspond to non new points, and that are in current frame, go deeper in the past.  
-                old_cors_prev = correspondences[key-j-1]["corrs_to_prev"]
-                curr_cors_prev = correspondences[key-j]["corrs_to_prev"]
-                while np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1]).size != 0 or j == curr_frame_ind:
-                    # Add current frame's 3d pts, which are older seen (first intersect term) and 
-                    points_3d_to_optimize[i].append(points_3d[curr_frame_ind - j][np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1])])
-                    
-                    # While there are old 3d pts seen in current frame, get their current frame indices 
-                    # Go from old to current frame index
-                    curr_cors_curr = correspondences[key-j]["corres_to_curr"]
-                    _current_frame_2d_pts_indices = curr_cors_curr[np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1])]
-                    for k in range(0,j):
-                        _current_frame_2d_pts_indices = correspondences[key-j+k]["corrs_to_curr"][_current_frame_2d_pts_indices]
-                    points_2d_to_optimize[i].append(points_2d[_current_frame_2d_pts_indices])
-
-                    j += 1
-                    curr_cors_prev = np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1]) 
-                    old_cors_prev = correspondences[key-j]["corrs_to_prev"]
-            import pdb
-            pdb.set_trace()
-            points_3d_to_optimize[i] = torch.cat(list(reversed(points_3d_to_optimize[i])), dim = 0) 
-            points_2d_to_optimize[i] = torch.cat(list(reversed(points_2d_to_optimize[i])), dim = 0)    
-
+            # Updates points_2d_to_optimize, points_3d_to_optimize
+            self._go_to_past_and_back(
+                i = i,
+                key = key, 
+                value = value,
+                correspondences = correspondences,
+                curr_frame_ind = curr_frame_ind,
+                points_2d = points_2d,
+                points_3d = points_3d,
+                points_2d_to_optimize = points_2d_to_optimize,
+                points_3d_to_optimize = points_3d_to_optimize
+            )
         return points_2d_to_optimize, points_3d_to_optimize
     
+    def _go_to_past_and_back(self, i, key, value, correspondences, curr_frame_ind,
+        points_2d, points_3d, points_2d_to_optimize, points_3d_to_optimize):
+        """_summary_
+
+        Args:
+            correspondences (_type_): _description_
+            key (_type_): _description_
+            value (_type_): _description_
+            curr_frame_ind (_type_): _description_
+            points_2d (_type_): _description_
+            points_3d (_type_): _description_
+            points_2d_to_optimize (_type_): _description_
+            points_3d_to_optimize (_type_): _description_
+            i (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """        
+        # If there is a previous frame, also append all 3d pts that were seen before (but still in opt window)
+        if i < len(correspondences.keys()) - 1:
+            # Go to past index
+            j = 0
+            # While there are 2d_points in the old frame that correspond to non new points, and that are in current frame, go deeper in the past.  
+            old_cors_prev = correspondences[key-j-1]["corrs_to_prev"]
+            curr_cors_prev = correspondences[key-j]["corrs_to_prev"]
+            while np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1]).size != 0 or j == curr_frame_ind:
+                # Add current frame's 3d pts, which are older seen (first intersect term) and 
+                points_3d_to_optimize[i].append(points_3d[curr_frame_ind - j][np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1])])
+                
+                # While there are old 3d pts seen in current frame, get their current frame indices 
+                # Go from old to current frame index
+                curr_cors_curr = correspondences[key-j]["corrs_to_curr"]
+                _current_frame_2d_pts_indices = curr_cors_curr[np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1])]
+                for k in range(0,j):
+                    _current_frame_2d_pts_indices = correspondences[key-j+k]["corrs_to_curr"][_current_frame_2d_pts_indices]
+                
+                points_2d_to_optimize[i].append(points_2d[i][_current_frame_2d_pts_indices])
+
+                j += 1
+                curr_cors_prev = np.intersect1d(np.where(old_cors_prev != -1), curr_cors_prev[curr_cors_prev!=-1]) 
+                old_cors_prev = correspondences[key-j]["corrs_to_prev"]
+            
+        points_3d_to_optimize[i] = torch.cat(list(reversed(points_3d_to_optimize[i])), dim = 0) 
+        points_2d_to_optimize[i] = torch.cat(list(reversed(points_2d_to_optimize[i])), dim = 0) 
+        
