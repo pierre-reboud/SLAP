@@ -1,3 +1,5 @@
 __pycache__
 *egg-info
 data/long_video.mp4
+libs/*
+build/*
