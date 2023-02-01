@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4)
 project(visual_slam3d)
 add_subdirectory(libs/g2o)
+add_subdirectory(libs/pybind11)
+pybind11_add_module(module_name pybind_test.cpp)
 
 #our main file to implement SLAP
 add_executable(visual_slam3d_node
