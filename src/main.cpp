@@ -26,7 +26,7 @@
 
 #include <cmath>
 #include <iostream>
-
+/*
 #include "../libs/g2o/g2o/core/block_solver.h"
 #include "../libs/g2o/g2o/core/factory.h"
 #include "../libs/g2o/g2o/core/optimization_algorithm_factory.h"
@@ -48,11 +48,11 @@
 
 #include "../libs/g2o/g2o/types/sba/types_sba.h"
 #include "../libs/g2o/g2o/types/sba/types_six_dof_expmap.h"
-
+*/
 #include <stdint.h>
 #include <unordered_set>
 
-//#include "g2o/visual_slam3d/visual_slam3d.h" 
+
 #include "visual_slam3d.h" 
 
 #define OUTLIER_RATIO 0.0
@@ -64,12 +64,6 @@
 using namespace std;
 using namespace g2o;
 
-class Sample {
- public:
-  static int uniform(int from, int to) {
-    return static_cast<int>(g2o::Sampler::uniformRand(from, to));
-  }
-};
 
 int main() {
   // visual SLAM
@@ -109,94 +103,7 @@ int main() {
 
   visual_slam3d->optimize(10);
 
-
-/*
-  EdgeSE3Expmap* odom = new EdgeSE3Expmap;
-  odom->vertices()[0] = visual_slam3d->optimizer_.vertex(0);
-  odom->vertices()[1] = visual_slam3d->optimizer_.vertex(1);
-  Eigen::Quaterniond quaternion5(0, 0, 0, 1);
-  Eigen::Vector3d position5(0, 0, 2);
-  g2o::SE3Quat pose5;
-  pose5.setTranslation(position5);
-  odom->setMeasurement(pose5);
-  visual_slam3d->optimizer_.addEdge(odom);
-
-
-  EdgeSE3Expmap* odom2 = new EdgeSE3Expmap;
-  odom2->vertices()[0] = visual_slam3d->optimizer_.vertex(1);
-  odom2->vertices()[1] = visual_slam3d->optimizer_.vertex(2);
-  Eigen::Quaterniond quaternion6(0, 0, 0, 1);
-  Eigen::Vector3d position6(0, 0, 2);
-  g2o::SE3Quat pose6;
-  pose6.setTranslation(position6);
-  odom2->setMeasurement(pose6);
-  visual_slam3d->optimizer_.addEdge(odom2);
-*/
-  /*
-
-  int vertex_id = 0;
-  for (size_t i = 0; i < 15; ++i) {
-    visual_slam3d->addPoseVertex(vertex_id, i * 0.04 - 1.0, 0, 0, 0, 0, 0, 1);
-
-    Vector3d trans(i * 0.04 - 1., 0, 0);
-    Eigen::Quaterniond q;
-    q.setIdentity();
-    g2o::SE3Quat pose(q, trans);
-
-    true_poses.push_back(pose);
-    vertex_id++;
-  }
-  int point_id = vertex_id;
-  int point_num = 0;
-  double sum_diff2 = 0;
-
-  cout << endl;
-  unordered_map<int, int> pointid_2_trueid;
-  unordered_set<int> inliers;
-
-  for (size_t i = 0; i < true_points.size(); ++i) {
-
-    int num_obs = 0;
-    for (size_t j = 0; j < true_poses.size(); ++j) {
-      Vector2d z = cam_params->cam_map(true_poses.at(j).map(true_points.at(i)));
-      if (z[0] >= 0 && z[1] >= 0 && z[0] < 640 && z[1] < 480) {
-        ++num_obs;
-      }
-    }
-    if (num_obs >= 2) {
-      visual_slam3d->addPointVertex(point_id, true_points.at(i)[0] + g2o::Sampler::gaussRand(0., 1), 
-                                              true_points.at(i)[1] + g2o::Sampler::gaussRand(0., 1), 
-                                              true_points.at(i)[2] + g2o::Sampler::gaussRand(0., 1));
-      bool inlier = true;
-      for (size_t j = 0; j < true_poses.size(); ++j) {
-        Vector2d z =
-            cam_params->cam_map(true_poses.at(j).map(true_points.at(i)));
-
-            cout << endl << "pose: " << true_poses.at(j) << " point: " << true_points.at(i) << " z: " << z << endl;
-
-        if (z[0] >= 0 && z[1] >= 0 && z[0] < 640 && z[1] < 480) {
-          double sam = g2o::Sampler::uniformRand(0., 1.);
-          if (sam < OUTLIER_RATIO) {
-            z = Vector2d(Sample::uniform(0, 640), Sample::uniform(0, 480));
-            inlier = false;
-          }
-          z += Vector2d(g2o::Sampler::gaussRand(0., PIXEL_NOISE),
-                        g2o::Sampler::gaussRand(0., PIXEL_NOISE));
-          visual_slam3d->addPosePointEdge(j, point_id, z[0], z[1]);
-        }
-      }
-
-      pointid_2_trueid.insert(make_pair(point_id, i));
-      ++point_id;
-      ++point_num;
-    }
-  }
-
-*/
-
  
-
-  
 
   return 0;
 }

@@ -88,6 +88,7 @@ class VisualSLAM3d {
             Vector3d trans(x, y, z);
             g2o::SE3Quat pose; //(R, t);
             pose.setTranslation(trans);
+            //TODO: implement QUATERNION
             g2o::VertexSE3Expmap* v_se3 = new g2o::VertexSE3Expmap();
             v_se3->setId(id);
             if (id == 0) {
