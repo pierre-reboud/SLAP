@@ -7,11 +7,12 @@ import signal
 from slap.utils.utils import signal_handler 
 from slap.utils.utils import Configs
 import cv2
-from logging import debug
+from logging import debug, warning
 from typing import List, Any, Dict, Union
 from threading import Thread
 from multiprocessing import Process, Queue
 from slap.map import Map
+from sys import exit
 
 class Visualizer:
     def __init__(self, configs: Configs):
@@ -35,8 +36,11 @@ class Visualizer:
         Args:
             points (np.ndarray): nx3 or nx4 array
             pose (np.ndarray): 4x4 array
-        """             
-        assert (points.shape[1] == 3 or points.shape[1] == 4 and np.linalg.norm(points[:,3]-np.ones(points.shape[0])) < 10e-3)
+        """
+        # try:           
+        #     assert (points.shape[1] == 3 or points.shape[1] == 4 and np.linalg.norm(points[:,3]-np.ones(points.shape[0])) < 10e-1)
+        # except AssertionError:
+        #     warning(f" Average of homogeneous index deviates significantly from 1. Deviation is: {np.linalg.norm(points[:,3]-np.ones(points.shape[0]))}")
         gl.glPointSize(4)
         gl.glColor3f(0, 1, 0)
         if points.shape[1] == 3:

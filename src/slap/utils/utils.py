@@ -81,6 +81,9 @@ class DownConfigs:
 def signal_handler(sig, frame):
     info("Interrupt signal received! Exiting...")
     exit(0)
+
+def strip(corrs):
+    return corrs[corrs!=-1]
         
 
 

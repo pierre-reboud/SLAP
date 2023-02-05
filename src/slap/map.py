@@ -50,7 +50,7 @@ class Map:
         # Update map frame index
         Map.global_frame_index += 1
         # Get the mask of the newly appearing points in current frame
-        new_points_mask = correspondences_to_prev < 0
+        new_points_mask = correspondences_to_prev == -1
         # Mask the 2d points to get the ones corresponding to new 3d points
         point_2d_indices_of_new_3d_points = np.where(new_points_mask)
         
@@ -68,7 +68,7 @@ class Map:
             correspondences_to_prev= correspondences_to_prev,
             correspondences_to_current= correspondences_to_current
         )
-        info(f"New points: {new_points_mask.sum()}, \n Already mapped points {len(new_points_mask)-new_points_mask.sum()}, \n Total points: {self.points.shape[0]}")
+        info(f"Frame nb:{Map.global_frame_index}, \n New points: {new_points_mask.sum()}, \n Already mapped points {len(new_points_mask)-new_points_mask.sum()}, \n Total points: {self.points.shape[0]}")
 
     def optimize(self) -> None:
         """_summary_
@@ -106,7 +106,7 @@ class Map:
         Args:
             points_3d (np.ndarray): _description_
             point_colors (np.ndarray): _description_
-        """        
+        """
         if len(self._optimizer_points_3d) == self.configs.optimizer.window_size:
             self._fixed_points_3d = np.concatenate((self._fixed_points_3d, self._optimizer_points_3d.pop(0)), axis = 0)
             self._fixed_point_colors = np.concatenate((self._fixed_point_colors, self._optimizer_point_colors.pop(0)), axis = 0)
@@ -124,18 +124,19 @@ class Map:
             points_2d_newer (np.ndarray): _description_
             correspondences_to_prev (np.ndarray): _description_
             correspondences_to_current (np.ndarray): _description_
-        """        
-        if points_2d_older is not None:
-            self._correspondences.update(
-                {
-                    0: {
-                    "pts_2d" : points_2d_older,
-                    "new_pts_mask" : new_points_mask,
-                    "corrs_to_prev" : -np.ones(len(points_2d_older), dtype = np.uint16),#correspondences_to_prev,
-                    "corrs_to curr" : np.arange(len(points_2d_older), dtype = np.uint16)#correspondences_to_current  
-                    }
-                }
-            )
+        """
+        # No need to optimize the first frame! 
+        # if points_2d_older is not None:
+        #     self._correspondences.update(
+        #         {
+        #             0: {
+        #             "pts_2d" : points_2d_older,
+        #             "new_pts_mask" : new_points_mask,
+        #             "corrs_to_prev" : -np.ones(len(points_2d_older), dtype = np.int16),#correspondences_to_prev,
+        #             "corrs_to curr" : np.arange(len(points_2d_older), dtype = np.int16)#correspondences_to_current  
+        #             }
+        #         }
+        #     )
         self._correspondences.update(
             {
                 Map.global_frame_index: {
@@ -146,9 +147,9 @@ class Map:
                 }
             }
         )
-        if Map.global_frame_index == self.configs.optimizer.window_size:
+        if len(self._correspondences.keys()) == self.configs.optimizer.window_size + 1:
             # + 1 because we compare an index with a length
-            self._correspondences.pop(Map.global_frame_index + 1 - self.configs.optimizer.window_size)
+            self._correspondences.pop(Map.global_frame_index - self.configs.optimizer.window_size)
 
 
     def _merge_with_map(self, optimized_3d_points : List[np.ndarray], optimized_cameras : np.ndarray) -> None:

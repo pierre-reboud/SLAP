@@ -33,7 +33,7 @@
     "ambiguity_resolution": "cv2",
     "points_extraction" : "linear_triangulation",
     "optimizer":{
-        "window_size": 5,
-        "iterations": 5
+        "window_size": 15,
+        "iterations": 1000
     }
 }
