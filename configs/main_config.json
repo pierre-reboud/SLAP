@@ -7,11 +7,11 @@
     "n_features": 2000,
     "size_descriptor_buffer": 32,
     "debug_frame_by_frame": false,
-    "visualization_2d": true,
-    "visualization_3d": true,
-    "vis":{
+    "visualization":{
         "size_cam_buffer": 1000,
-        "size_pts_buffer": 100000
+        "size_pts_buffer": 100000,
+        "_2d": false,
+        "_3d": true
     },
     "grey": false,
     "intrinsics": {
@@ -26,8 +26,17 @@
         "k3": 0
     },
     "libs":{
-        "use_g2o":true,
+        "use_g2o":false,
+        "use_torch": true,
         "use_panglin":true,
         "use_cv2":true
-    }
+    },
+    "ambiguity_resolution": "cv2",
+    "points_extraction" : "linear_triangulation",
+    "optimizer":{
+        "lr": 0.0005,
+        "window_size": 10,
+        "iterations": 100
+    },
+    "tensorboard_logdir_path": "/home/pierre/git/university/3d_scanning_and_motion_capture/SLAP/tensorboard"
 }

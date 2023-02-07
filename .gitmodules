@@ -2,3 +2,6 @@
 	path = libs/pybind11
 	url = ../../pybind/pybind11
 	branch = stable
+[submodule "libs/g2opy"]
+	path = libs/g2opy
+	url = https://github.com/uoip/g2opy.git
