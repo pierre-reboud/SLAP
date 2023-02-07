@@ -6,10 +6,17 @@ from torch import Tensor
 from torch.optim import Adam
 import g2o
 from typing import Dict, Tuple, Any, Union, List
+from torch.utils.tensorboard import SummaryWriter
+from multiprocessing import Queue, Process
+from time import sleep
 
 class Optimizer():
     def __init__(self, configs : Configs):
         self.configs : Configs = configs
+        # self.queue : Queue = Queue()
+        # sw_process = Process(target = self._summary_write, args = [self.queue])
+        # sw_process.daemon = True
+        # sw_process.start()     
 
     def bundle_adjust(self, points_2d : List[Tensor], points_3d : List[np.ndarray],
         cameras : np.ndarray, correspondences : Dict[int, Dict[str, np.ndarray]]
@@ -32,8 +39,9 @@ class Optimizer():
         # Torchify parameters (3d points and cameras)
         cameras : Tensor = torch.tensor(cameras, requires_grad = True)
         list_of_points_2d : List[Tensor] = [torch.tensor(pts_2d) for pts_2d in points_2d]      
-        points_3d : List[Tensor] = torch.cat([torch.tensor(pts_3d) for pts_3d in points_3d])
+        points_3d : Tensor = torch.cat([torch.tensor(pts_3d) for pts_3d in points_3d])
         points_3d = torch.tensor(points_3d, requires_grad = True)
+        # _dcopy_pts_3d = points_3d.detach().clone()
         # Listify back the pts 3d tensor (:-1)
         list_of_points_3d : List[Tensor]= list(torch.tensor_split(points_3d, _pts_3d_group_lengths[:-1]))
         # Group to know which 3d points to project in which frame. The different 
@@ -48,7 +56,7 @@ class Optimizer():
             )
 
         # Initialize optimizer and 3D points tensor
-        optimizer = Adam([points_3d, cameras], lr=1e-3)
+        optimizer = Adam([points_3d, cameras], lr=self.configs.optimizer.lr)
         # Initialize loss function
         loss_func : torch.nn.MSELosss = torch.nn.MSELoss(reduction = "none")
         for i in range(self.configs.optimizer.iterations):
@@ -58,14 +66,13 @@ class Optimizer():
             # Compute reprojection error
             pt_wise_loss : Tensor
             total_loss : float
-            total_loss = self.reprojection_error(projections, points_2d_optim, loss_func)
+            total_loss = self.reprojection_error(projections, points_2d_optim, loss_func, adam_iter = i)
             # Prune points
             #self.prune_points(pt_wise_loss, lengths_per_frame)
             # Compute gradients
             total_loss.backward(retain_graph = True)
             # Update parameters
             optimizer.step()
-       
         points_3d : List[np.ndarray] = [pts_3d.detach().numpy() for pts_3d in list_of_points_3d]
         cameras : np.ndarray = cameras.detach().numpy()
 
@@ -92,7 +99,7 @@ class Optimizer():
         return all_projections
         
 
-    def reprojection_error(self, projections : Tensor, points_2d : Tensor, loss_func : torch.nn.MSELoss) -> Tuple[Tensor, Tensor]:
+    def reprojection_error(self, projections : Tensor, points_2d : Tensor, loss_func : torch.nn.MSELoss, adam_iter : int) -> Tuple[Tensor, Tensor]:
         """_summary_
 
         Args:
@@ -102,10 +109,13 @@ class Optimizer():
         """
         total_loss = 0.0
         for i, (projs, pts_2d) in enumerate(zip(projections, points_2d)):
+            # if adam_iter == 10:
+            # breakpoint()
             pt_wise_loss : Tensor = loss_func(input = projs, target = pts_2d).mean(dim=1)
             projective_loss : float = pt_wise_loss.mean(dim=0)
             # Implement reprojection error calculation
             total_loss += projective_loss
+        # self.queue.put((total_loss.clone().detach()/len(points_2d), adam_iter))
         return total_loss[None]
     
     def prune_points(self, pt_wise_los : Tensor, lengths_per_frame):
@@ -228,6 +238,14 @@ class Optimizer():
         else:
             raise Exception(f"Start index must be at least 1 smaller than end index, currently: start:{start} end:{end}")
 
+    def _summary_write(self, queue : Queue):
+        self.sw = SummaryWriter(log_dir = self.configs.tensorboard_logdir_path)
+        while True:
+            while not queue.empty():
+                loss, iteration = queue.get()
+                self.sw.add_scalar("Loss_per_frame", loss, iteration)
+            sleep(1)
+    
     # def _get_past_indices_to_current_indices(self, correspondences : Dict[int, Dict[str, np.ndarray]], start: int, end : int):
     #     """Alors ca c'est très tordu mais bougrement intelligent! (bis)
 
