@@ -82,8 +82,8 @@ int main() {
   visual_slam3d->addPoseVertex(2, 0, 0, 0, 0, 0, 0, 1);
 
 
-  visual_slam3d->addPointVertex(3, 0, 0, 6);
-  visual_slam3d->addPointVertex(4, 0, 0, 6);
+  visual_slam3d->addPointVertex(3, 0, 0, 0.1);
+  visual_slam3d->addPointVertex(4, 0, 0, 0.1);
 
   Vector2d z03 = visual_slam3d->project(-2, 0, 6);
   Vector2d z13 = visual_slam3d->project(-2, 0, 4);

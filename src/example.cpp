@@ -97,7 +97,8 @@ int main() {
 
   int vertex_id = 0;
   for (size_t i = 0; i < 15; ++i) {
-    visual_slam3d->addPoseVertex(vertex_id, i * 0.04 - 1.0, 0, 0, 0, 0, 0, 1);
+    //visual_slam3d->addPoseVertex(vertex_id, i * 0.04 - 1.0, 0, 0, 0, 0, 0, 1);
+    visual_slam3d->addPoseVertex(vertex_id, 0.0, 0, 0, 0, 0, 0, 1);
 
     Vector3d trans(i * 0.04 - 1., 0, 0);
     Eigen::Quaterniond q;
