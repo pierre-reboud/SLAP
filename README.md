@@ -8,12 +8,13 @@ cd SLAP
 pip install -r requirements.txt
 pip install -e .
 ```
+**Warning**: Additional modules might have to be installed, as requirements.txt is currently outdated.
 
-Additional libraries have to be installed:
+Also, additional libraries have to be manually installed:
 * pangolin: Follow the [instructions](https://github.com/uoip/pangolin)
 
 ## Usage
-1. Specify the desired parameters in the ```configs/program.json``` file.
+1. Choose one of the 2 desired parameters sets ```configs/<x>_main_config.json``` and apply this change in lines 24 and 25 of ```src/slap/utils/utils.py```. ```<x>``` can take the value "video" for using a dashboard camera video from a car (no ground truth poses), or "freiburg" for using the freiburg rgbd dataset (with ground truth poses).
 2. Run the following console command:
 ```console
 python main.py

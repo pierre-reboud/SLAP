@@ -1,0 +1,43 @@
+{
+    "video_name": "video.mp4",
+    "program": "slam",
+    "lowe_ratio": 0.5,
+    "frame_h": 720,
+    "frame_w": 1280,
+    "n_features": 2000,
+    "size_descriptor_buffer": 32,
+    "debug_frame_by_frame": false,
+    "visualization":{
+        "size_cam_buffer": 1000,
+        "size_pts_buffer": 100000,
+        "_2d": false,
+        "_3d": true
+    },
+    "grey": false,
+    "intrinsics": {
+        "fx": 580,
+        "fy": 580,
+        "cx": 640,
+        "cy": 360,
+        "k1": -0.25722,
+        "k2": 0.09022,
+        "p1": 0,
+        "p2": 0,
+        "k3": 0
+    },
+    "libs":{
+        "use_g2o":false,
+        "use_torch": true,
+        "use_panglin":true,
+        "use_cv2":true
+    },
+    "ambiguity_resolution": "cv2",
+    "points_extraction" : "linear_triangulation",
+    "optimizer":{
+        "lr": 0.0005,
+        "window_size": 10,
+        "iterations": 100,
+        "pixel_rejection_threshold":4
+    },
+    "tensorboard_logdir_path": "/home/pierre/git/university/3d_scanning_and_motion_capture/SLAP/tensorboard"
+}

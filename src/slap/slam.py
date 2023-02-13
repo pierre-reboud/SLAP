@@ -75,13 +75,13 @@ class Slam:
         # points_2d_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[older][match[0].trainIdx].pt) for match in matches])
         # points_2d_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[newer][match[0].queryIdx].pt) for match in matches])
         points_2d_older : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[1][match.trainIdx].pt) for match in self.matches_buffer[-1]])
-        points_2d_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[2][match.queryIdx].pt) for match in self.matches_buffer[-1]]) 
-
+        points_2d_newer : np.ndarray = np.array([np.uint16(self.video.keypoints_buffer[2][match.queryIdx].pt) for match in self.matches_buffer[-1]])
         normalized_points_2d_older = (np.linalg.inv(self.configs.camera_matrix)@np.concatenate((points_2d_older.T,np.ones(len(points_2d_older))[None]), axis = 0))[:2].T
         normalized_points_2d_newer = (np.linalg.inv(self.configs.camera_matrix)@np.concatenate((points_2d_newer.T,np.ones(len(points_2d_older))[None]), axis = 0))[:2].T
 
         point_colors = self.video.frames_buffer[newer,points_2d_newer[:,1], points_2d_newer[:,0]] / 255.0 
         # Cam pose is 4x4 pose (takes point in first, transforms into second coord sys)
+        
         camera_pose : np.ndarray = self._get_cam_pose(
             points_2d_older = points_2d_older,
             points_2d_newer = points_2d_newer

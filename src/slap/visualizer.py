@@ -49,7 +49,7 @@ class Visualizer:
             world_points = points
         pangolin.DrawPoints(world_points[:,:3], colors)
 
-    def draw_cams(self, poses: Union[np.ndarray, List[np.ndarray]]):
+    def draw_cams(self, poses: Union[np.ndarray, List[np.ndarray]], frame_index : int):
         """_summary_
 
         Args:
@@ -62,10 +62,19 @@ class Visualizer:
         gl.glLineWidth(1)
         gl.glColor3f(0.0, 0.0, 1.0)
         poses = np.array(poses)
-        pangolin.DrawCameras(poses)
+        pangolin.DrawCameras(poses[:frame_index+1])
+        if self.configs.video_name == "rgb":
+            gl.glColor3f(1.0, 0.0, 0.0)
+            # print(self.configs._gt_cameras[:Map.global_frame_index+1].shape,  self.configs._gt_cameras[:Map.global_frame_index],"\n\n\n\n\n")
+            pangolin.DrawCameras(self.configs._gt_cameras[:frame_index+1])
     
     def draw(self, map: Map):
-        self.queue.put(map)
+        """_summary_
+
+        Args:
+            map (Map): _description_
+        """        
+        self.queue.put((map, Map.global_frame_index))
 
     def run(self, queue : Queue):
         """_summary_
@@ -79,7 +88,7 @@ class Visualizer:
         if self.configs.visualization._3d:
             while not pangolin.ShouldQuit():
                 while not queue.empty():
-                    self.map_state = queue.get()  
+                    self.map_state, frame_index = queue.get()  
                 #if not pangolin.ShouldQuit() and (not points is None or not cams is None) and self.configs.visualization_3d :
                 gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
                 gl.glClearColor(1.0, 1.0, 1.0, 1.0)
@@ -88,7 +97,7 @@ class Visualizer:
                     if not len(self.map_state.points) == 0:
                         self.draw_points(points = self.map_state._fixed_points_3d, colors = self.map_state._fixed_point_colors)
                     if not len(self.map_state.cameras) == 0:
-                        self.draw_cams(poses = self.map_state.cameras)
+                        self.draw_cams(poses = self.map_state.cameras, frame_index = frame_index)
                 pangolin.FinishFrame()
                 
                 

@@ -1,6 +1,6 @@
 # From README https://github.com/uoip/g2opy
 import numpy as np
-from slap.utils.utils import Configs, strip
+from slap.utils.utils import Configs
 import torch
 from torch import Tensor
 from torch.optim import Adam
@@ -9,14 +9,15 @@ from typing import Dict, Tuple, Any, Union, List
 from torch.utils.tensorboard import SummaryWriter
 from multiprocessing import Queue, Process
 from time import sleep
+from datetime import datetime
 
 class Optimizer():
     def __init__(self, configs : Configs):
         self.configs : Configs = configs
-        # self.queue : Queue = Queue()
-        # sw_process = Process(target = self._summary_write, args = [self.queue])
-        # sw_process.daemon = True
-        # sw_process.start()     
+        self.queue : Queue = Queue()
+        sw_process = Process(target = self._summary_write, args = [self.queue])
+        sw_process.daemon = True
+        sw_process.start()     
 
     def bundle_adjust(self, points_2d : List[Tensor], points_3d : List[np.ndarray],
         cameras : np.ndarray, correspondences : Dict[int, Dict[str, np.ndarray]]
@@ -49,16 +50,24 @@ class Optimizer():
         # which also gets updated due to gradient flowing though all Tensor 
         # operations
 
-        points_2d_optim, points_3d_optim = self._group_pts_per_frame(
+        points_2d_optim, points_3d_optim, indices_from_points_to_optimize = self._group_pts_per_frame(
             points_2d = list_of_points_2d,
             points_3d = list_of_points_3d,
             correspondences = correspondences
             )
-
-        # Initialize optimizer and 3D points tensor
-        optimizer = Adam([points_3d, cameras], lr=self.configs.optimizer.lr)
         # Initialize loss function
         loss_func : torch.nn.MSELosss = torch.nn.MSELoss(reduction = "none")
+        # Prune points
+        # projections : List[Tensor] = self.project(points_3d_optim, cameras)
+        # _, pt_wise_losses = self.reprojection_error(projections, points_2d_optim, loss_func, adam_iter = 0)
+        # points_3d, correspondences = self._prune_points(
+        #     correspondences = correspondences,
+        #     _pts_3d_group_lengths = _pts_3d_group_lengths,
+        #     pt_wise_losses = pt_wise_losses,
+        #     indices_of_3d_pts = indices_from_points_to_optimize
+        #     ):
+        # Initialize optimizer and 3D points tensor
+        optimizer = Adam([points_3d, cameras], lr=self.configs.optimizer.lr)
         for i in range(self.configs.optimizer.iterations):
             optimizer.zero_grad()
             # Compute projection of 3D points
@@ -66,9 +75,7 @@ class Optimizer():
             # Compute reprojection error
             pt_wise_loss : Tensor
             total_loss : float
-            total_loss = self.reprojection_error(projections, points_2d_optim, loss_func, adam_iter = i)
-            # Prune points
-            #self.prune_points(pt_wise_loss, lengths_per_frame)
+            total_loss, _ = self.reprojection_error(projections, points_2d_optim, loss_func, adam_iter = i)
             # Compute gradients
             total_loss.backward(retain_graph = True)
             # Update parameters
@@ -108,18 +115,22 @@ class Optimizer():
             correspondences (Tensor): _description_
         """
         total_loss = 0.0
+        pt_wise_losses = []
         for i, (projs, pts_2d) in enumerate(zip(projections, points_2d)):
             # if adam_iter == 10:
             # breakpoint()
             pt_wise_loss : Tensor = loss_func(input = projs, target = pts_2d).mean(dim=1)
             projective_loss : float = pt_wise_loss.mean(dim=0)
             # Implement reprojection error calculation
+            pt_wise_losses.append(pt_wise_loss)
             total_loss += projective_loss
-        # self.queue.put((total_loss.clone().detach()/len(points_2d), adam_iter))
-        return total_loss[None]
-    
-    def prune_points(self, pt_wise_los : Tensor, lengths_per_frame):
-        pass
+            self.queue.put({
+                "loss": total_loss.clone().detach()/len(points_2d),
+                "max_pixel_error": np.linalg.norm(self.configs.camera_matrix[:,:2]@(projs[torch.argmax(pt_wise_loss,)]-pts_2d[torch.argmax(pt_wise_loss,)]).clone().detach().numpy()),
+                "errors" : np.linalg.norm(self.configs.camera_matrix[:,:2]@(projs-pts_2d).clone().detach().numpy().T, axis = 0),
+                "iter": adam_iter
+                })
+        return total_loss[None], pt_wise_losses
 
     def reformat_tensors(self, points_3d : Tensor, cameras: Tensor, lengths_per_frame):
         cameras = cameras.numpy()
@@ -159,8 +170,9 @@ class Optimizer():
         key : int
         value : Dict[str, np.ndarray]
         # Point groups for optimization
-        points_2d_to_optimize : List[Tensor] = [[] for _ in range(len(correspondences.keys()))]
         points_3d_to_optimize : List[Tensor] = [[] for _ in range(len(correspondences.keys()))]
+        points_2d_to_optimize : List[Tensor] = [[] for _ in range(len(correspondences.keys()))]
+        indices_from_points_to_optimize : List[Tensor] = [[[],[]] for _ in range(len(correspondences.keys()))]
         # Iterate from oldest to newest frame
         for i, (key, value)  in enumerate(correspondences.items()):
             # Append newly seen pts to current frame's optimization pts
@@ -170,6 +182,8 @@ class Optimizer():
                 breakpoint()
             points_3d_to_optimize[i].append(points_3d[i])
             points_2d_to_optimize[i].append(points_2d[i][value["corrs_to_prev"]==-1])
+            indices_from_points_to_optimize[i][1].append(torch.arange(len(points_3d[i])))
+            indices_from_points_to_optimize[i][0].append(torch.full((len(points_3d[i]),), i))
             # go to future frames
             j = 1
             while key + j in correspondences.keys(): 
@@ -179,15 +193,23 @@ class Optimizer():
                 if _indices_pts_3d_to_select.size == 0:
                     points_3d_to_optimize[i + j].append(points_3d[i][_indices_pts_3d_to_select])
                     points_2d_to_optimize[i + j].append(points_2d[i + j][_indices_pts_2d_to_select])
+                    indices_from_points_to_optimize[i+j][0].append(torch.full((len(_indices_pts_3d_to_select),), i))
+                    indices_from_points_to_optimize[i+j][1].append(_indices_pts_3d_to_select)
                 j += 1
             points_3d_to_optimize[i] = torch.cat(list(points_3d_to_optimize[i]), dim = 0) 
             points_2d_to_optimize[i] = torch.cat(list(points_2d_to_optimize[i]), dim = 0)
+            try:
+                indices_from_points_to_optimize[i] = torch.stack(
+                    (torch.cat(list(indices_from_points_to_optimize[i][1]), dim = 0),
+                    torch.cat(list(indices_from_points_to_optimize[i][0]), dim = 0)))
+            except TypeError:
+                breakpoint()
         for group2d, group3d in zip(points_2d_to_optimize, points_3d_to_optimize):
             try:
                 assert len(group2d) == len(group3d)
             except AssertionError:
                 breakpoint()
-        return points_2d_to_optimize, points_3d_to_optimize
+        return points_2d_to_optimize, points_3d_to_optimize, indices_from_points_to_optimize
   
     def _get_correspondences_to_past_indices(self, correspondences : Dict[int, Dict[str, np.ndarray]], start : int, end : int):
         """Alors ca c'est très tordu mais bougrement intelligent!
@@ -229,7 +251,6 @@ class Optimizer():
             start (int): _description_
             end (int): _description_
         """
-        #print("Wesh       " , start, end, start_indices)
         if start < end:
             while start < end:
                 start_indices = correspondences[start + 1]["corrs_to_curr"][start_indices]
@@ -239,12 +260,37 @@ class Optimizer():
             raise Exception(f"Start index must be at least 1 smaller than end index, currently: start:{start} end:{end}")
 
     def _summary_write(self, queue : Queue):
-        self.sw = SummaryWriter(log_dir = self.configs.tensorboard_logdir_path)
+        """Writes the content of the multiprocessing queue to the tensorboard
+        SummaryWriter object.
+
+        Args:
+            queue (Queue): _description_
+        """
+        folder = datetime.now().strftime("%Y_%m_%d__%H_%M_%S") 
+        self.sw = SummaryWriter(log_dir = self.configs.tensorboard_logdir_path + "/" + folder)
         while True:
             while not queue.empty():
-                loss, iteration = queue.get()
-                self.sw.add_scalar("Loss_per_frame", loss, iteration)
+                things = queue.get()
+                loss, max_pixel_dist, reproj_errors, iter = things.values()
+                self.sw.add_scalar("Loss_per_frame", loss, iter)
+                self.sw.add_scalar("Max_pixel_dist", max_pixel_dist, iter)
+                self.sw.add_histogram("Reprojection_errors", reproj_errors, iter)
             sleep(1)
+
+    def _prune_points(self, correspondences, _pts_3d_group_lengths, pt_wise_losses, indices_of_3d_pts):
+        # Transform the reprojection MSE errors to pixel distances
+        pt_wise_losses : Tensor = np.sqrt(pt_wise_losses)*self.configs.intrinsics.fx
+        # Get pixel indices to reject from points group
+        group_indices_to_remove = torch.argwhere(pt_wise_losses>self.configs.optimizer.pixel_rejection_threshold)[:,0]
+        # Pruned 3d points
+        global_indices_to_remove = indices_of_3d_pts[group_indices_to_remove]
+        for i in range(set(global_indices_to_remove[:,0])):
+            if i == 0:
+                pt_indices_to_remove = global_indices_to_remove[global_indices_to_remove[:,0]==i,1]  
+            else:
+                pt_indices_to_remove = global_indices_to_remove[global_indices_to_remove[:,0]==i,1] + pts_3d_group_lengths[i-1]
+
+        pass
     
     # def _get_past_indices_to_current_indices(self, correspondences : Dict[int, Dict[str, np.ndarray]], start: int, end : int):
     #     """Alors ca c'est très tordu mais bougrement intelligent! (bis)

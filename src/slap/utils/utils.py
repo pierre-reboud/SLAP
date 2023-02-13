@@ -7,10 +7,7 @@ import os
 from typing import List, Dict, Any, Generator
 from dataclasses import dataclass
 from logging import debug, info
-
-root_path : List[str] = __path__[0].split("/")[:-2]
-kwargs_path : str = os.path.join("/", *root_path,"configs","main_config.json")
-data_path : str = os.path.join("/", *root_path,"data")
+from scipy.spatial.transform import Rotation
 
 @dataclass
 class Configs:
@@ -22,7 +19,12 @@ class Configs:
 
         Args:
             kwargs (_type_, optional): _description_. Defaults to None.
-        """        
+        """
+        root_path : List[str] = __path__[0].split("/")[:-2]
+        configs_file_name = "freiburg_main_config.json" #"freiburg_main_config.json" #"video_main_config.json"
+        data_name = "data/rgbd_dataset_freiburg1_xyz/" #"data/rgbd_dataset_freiburg1_xyz/" #"data" 
+        kwargs_path : str = os.path.join("/", *root_path,"configs",configs_file_name)
+        self.data_path : str = os.path.join("/", *root_path, data_name)     
         def local_setattr(down_self, down_kwargs):
             """_summary_
 
@@ -39,10 +41,9 @@ class Configs:
                 else:
                     setattr(down_self, karg, varg)  
         if not kwargs:
-            kwargs = Configs.get_args()
+            kwargs = Configs.get_args(kwargs_path)
         local_setattr(self, kwargs)
         debug(f"Configurations: {vars(self)}")
-        self.video_path : str = os.path.join(data_path, self.video_name)
         self.camera_matrix : np.ndarray = np.array([
             [self.intrinsics.fx,0,self.intrinsics.cx],
             [0,self.intrinsics.fy,self.intrinsics.cy],
@@ -55,10 +56,13 @@ class Configs:
             self.intrinsics.p2,
             self.intrinsics.k3
             ])
-
+        self.video_path : str = os.path.join(self.data_path, self.video_name)
+        # if self.video_name == "video.mp4":
+        if self.video_name == "rgb":
+            self._get_gt_cameras()
 
     @staticmethod
-    def get_args() -> Dict[str, Any]:
+    def get_args(kwargs_path) -> Dict[str, Any]:
         """_summary_
 
         Returns:
@@ -68,6 +72,28 @@ class Configs:
             kwargs : Dict[str, Any] = json.load(j)
             return kwargs
     
+    def _get_gt_cameras(self) -> None:
+        frame_names = set(sorted(os.listdir(self.video_path)))
+        self._gt_cameras = np.zeros((len(frame_names),4,4), dtype = np.float64)
+        j = 0
+        with open(self.data_path + "/groundtruth.txt", "r") as f:
+            for i, line in enumerate(f):
+                if i < 3 or line[0] not in frame_names:
+                    j+=1
+                    continue
+                line = line.split(" ")
+                translations = line[1:4]
+                #qx qy qz qw
+                quaternions = line[4:]
+                _rotation = Rotation.from_quat(quaternions)
+                if i == 3:
+                    self._gt_cameras[i-j][:3,:3] = _rotation.as_matrix()
+                    self._gt_cameras[i-j][:3, 3] = np.array(translations, dtype = np.float64)
+                _rotation = Rotation.from_quat(quaternions)
+                self._gt_cameras[i-j][:3,:3] = self._gt_cameras[0][:3,:3].T@_rotation.as_matrix()
+                self._gt_cameras[i-j][:3,3] = np.array(translations, dtype = np.float64) - self._gt_cameras[0][:3,3]
+                self._gt_cameras[i-j][3,3] = 1.0
+
     def __repr__(self) -> str:
         return ""
 
@@ -81,9 +107,5 @@ class DownConfigs:
 def signal_handler(sig, frame):
     info("Interrupt signal received! Exiting...")
     exit(0)
-
-def strip(corrs):
-    return corrs[corrs!=-1]
-        
 
 

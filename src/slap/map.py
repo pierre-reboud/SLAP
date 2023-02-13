@@ -69,6 +69,8 @@ class Map:
             correspondences_to_current= correspondences_to_current
         )
         info(f"Frame nb:{Map.global_frame_index}, \n New points: {new_points_mask.sum()}, \n Already mapped points {len(new_points_mask)-new_points_mask.sum()}, \n Total points: {self.points.shape[0]}")
+        # if Map.global_frame_index == 25:
+        #     breakpoint()
 
     def optimize(self) -> None:
         """_summary_
