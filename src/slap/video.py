@@ -21,7 +21,7 @@ class Video:
         self.stream = self.get_stream(self.path)
         self.orb = cv2.ORB_create(nfeatures = configs.n_features)
         self.matcher = cv2.BFMatcher()
-        # Buffer of two sequential frames
+        # Buffer of three sequential frames
         _buffer_size = (3, self.frame_H, self.frame_W) if configs.grey else (3, self.frame_H, self.frame_W,3) # (2, self.frame_H, self.frame_W) if configs.grey else (2, self.frame_H, self.frame_W,3)
         self.frames_buffer : np.ndarray = np.empty(_buffer_size, dtype = np.uint8)
         self.descriptors_buffer : np.ndarray = np.empty((3, configs.n_features, configs.size_descriptor_buffer), dtype = np.float32) # np.empty((2, configs.n_features, configs.size_descriptor_buffer), dtype = np.float32)

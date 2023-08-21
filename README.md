@@ -1,5 +1,5 @@
 # SLAP (SLam but it's not About Poetry)
-SLAP is a simple monocular SLAM implementation.
+SLAP is a simple monocular SLAM implementation inspired by [twitchslam](https://github.com/geohot/twitchslam).
 ## Installation
 Installation of the module is performed as follows:
 ```console
@@ -9,7 +9,9 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-Additional libraries have to be installed:
+**Warning**: Additional modules might have to be installed, as requirements.txt is currently outdated.
+
+Additionally, the libraries has to be manually installed:
 * pangolin: Follow the [instructions](https://github.com/uoip/pangolin)
 
 ## Usage

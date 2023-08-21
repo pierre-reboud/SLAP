@@ -159,7 +159,7 @@ class Slam:
         Returns:
             np.ndarray: 4x4 pose array in the coordinates of the previous pose
         """
-        # Hacky ambiguity resolution
+        # Cv2 ambiguity resolution
         if self.configs.ambiguity_resolution == "cv2":
             E, _ = cv2.findEssentialMat(
                 points2 = points_2d_newer,
@@ -175,7 +175,7 @@ class Slam:
                 cameraMatrix = self.configs.camera_matrix
                 )
             t = t[:,0]
-        # Cv2 ambiguity resolution
+        # Hacky ambiguity resolution
         elif self.configs.ambiguity_resolution == "hacky":
             F, _mask = cv2.findFundamentalMat(
                 points1 = points_2d_newer,

@@ -69,6 +69,8 @@ class Map:
             correspondences_to_current= correspondences_to_current
         )
         info(f"Frame nb:{Map.global_frame_index}, \n New points: {new_points_mask.sum()}, \n Already mapped points {len(new_points_mask)-new_points_mask.sum()}, \n Total points: {self.points.shape[0]}")
+        # if Map.global_frame_index == 25:
+        #     breakpoint()
 
     def optimize(self) -> None:
         """_summary_
@@ -125,18 +127,6 @@ class Map:
             correspondences_to_prev (np.ndarray): _description_
             correspondences_to_current (np.ndarray): _description_
         """
-        # No need to optimize the first frame! 
-        # if points_2d_older is not None:
-        #     self._correspondences.update(
-        #         {
-        #             0: {
-        #             "pts_2d" : points_2d_older,
-        #             "new_pts_mask" : new_points_mask,
-        #             "corrs_to_prev" : -np.ones(len(points_2d_older), dtype = np.int16),#correspondences_to_prev,
-        #             "corrs_to curr" : np.arange(len(points_2d_older), dtype = np.int16)#correspondences_to_current  
-        #             }
-        #         }
-        #     )
         self._correspondences.update(
             {
                 Map.global_frame_index: {
@@ -153,7 +143,8 @@ class Map:
 
 
     def _merge_with_map(self, optimized_3d_points : List[np.ndarray], optimized_cameras : np.ndarray) -> None:
-        """_summary_
+        """Adds the cameras to the map cameras array, and replaces the 
+        map's points with the optimized ones.
 
         Args:
             optimized_3d_points (List[np.ndarray]): _description_
